@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Bot is running - Step 2 signals"
+    return "Bot is running - Step 2.5 stronger signals"
 
 def get_closes():
     url = "https://query1.finance.yahoo.com/v8/finance/chart/EURUSD=X?range=1d&interval=1m"
@@ -23,16 +23,21 @@ def run_bot():
         try:
             closes = get_closes()
             price = closes[-1]
-            # Simple strategy: fast average vs slow average
             fast = sum(closes[-5:]) / 5
             slow = sum(closes[-20:]) / 20
-            if fast > slow:
-                signal = "BUY signal"
-            elif fast < slow:
-                signal = "SELL signal"
+            long_avg = sum(closes[-60:]) / 60
+            diff = fast - slow
+
+            # Upgrade 1: Ignore tiny noise - must be clearly moving
+            # Upgrade 2: Need 2 confirmations - fast vs slow AND price vs long average
+            if diff > 0.0002 and price > long_avg:
+                signal = "BUY signal - STRONG"
+            elif diff < -0.0002 and price < long_avg:
+                signal = "SELL signal - STRONG"
             else:
-                signal = "HOLD"
-            print(f"EURUSD: {price} | Fast: {fast:.5f} Slow: {slow:.5f} -> {signal}", flush=True)
+                signal = "HOLD - too flat / not confirmed"
+
+            print(f"EURUSD: {price} | Fast: {fast:.5f} Slow: {slow:.5f} Long: {long_avg:.5f} -> {signal}", flush=True)
         except Exception as e:
             print(f"Price fetch failed: {e}", flush=True)
         time.sleep(30)
