@@ -38,7 +38,7 @@ print(f"🤖 GOLD BOT V4 - WINNER | Backtest: $1000 -> $1310 in 59 days | SL $5 
 send_telegram("🤖 Gold Bot V4 WINNER Started! Backtested: $1000 -> $1310. Strategy: EMA 9/21, SL $5 TP $10, Breakeven at +$5.")
 
 while True:
-    try:
+try:
     r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{PAIR}?range=3d&interval=15m", headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     j = r.json()["chart"]["result"][0]
     closes = [x for x in j["indicators"]["quote"][0]["close"] if x is not None]
