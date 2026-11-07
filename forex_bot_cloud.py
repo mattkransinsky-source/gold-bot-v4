@@ -1,4 +1,9 @@
 import os
+import time
+import requests
+import yfinance as yf
+import pandas as pd
+import numpy as np
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 PAIR = "GC=F"
