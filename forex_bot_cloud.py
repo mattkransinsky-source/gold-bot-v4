@@ -13,7 +13,7 @@ import requests
 import yfinance as yf
 import pandas as pd
 import numpy as np
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 PAIR = "GC=F"
 BALANCE = 1000.0
