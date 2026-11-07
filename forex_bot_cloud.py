@@ -39,9 +39,17 @@ send_telegram("🤖 Gold Bot V4 WINNER Started! Backtested: $1000 -> $1310. Stra
 
 while True:
     try:
-        df = yf.download(PAIR, period="3d", interval="15m", progress=False)
-        if df.empty:
-            time.sleep(30); continue
+    r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{PAIR}?range=3d&interval=15m", headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+    j = r.json()["chart"]["result"][0]
+    closes = [x for x in j["indicators"]["quote"][0]["close"] if x is not None]
+    df = pd.DataFrame({"Close": closes})
+except Exception as e:
+    print(f"Price fetch failed: {e} - retrying in 30s")
+    time.sleep(30)
+    continue
+if df.empty:
+    time.sleep(30)
+    continue
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         df['EMA_FAST'] = df['Close'].ewm(span=9).mean()
