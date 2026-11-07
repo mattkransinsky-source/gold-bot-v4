@@ -1,110 +1,36 @@
-import os, threading
-from flask import Flask
-app = Flask(__name__)
-@app.route('/')
-def home():
-    return "Bot is running"
-def run_web():
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
-threading.Thread(target=run_web, daemon=True).start()
 import os
 import time
 import requests
-import yfinance as yf
 import pandas as pd
-import numpy as np
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-PAIR = "GC=F"
-BALANCE = 1000.0
-RISK_PER_TRADE = 0.01
-STOP_LOSS_DOLLARS = 5.0   # WINNER: Tight $5 SL
-TAKE_PROFIT_DOLLARS = 10.0 # WINNER: $10 TP = 1:2
+from flask import Flask
 
-balance = BALANCE
-in_trade = None
-entry_price = 0
-breakeven_done = False
+app = Flask(__name__)
 
-def send_telegram(msg):
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": msg}, timeout=10)
-        print("📩 Telegram sent")
-    except Exception as e:
-        print(f"Telegram failed: {e}")
+@app.route("/")
+def home():
+    return "Bot is running"
 
-print(f"🤖 GOLD BOT V4 - WINNER | Backtest: $1000 -> $1310 in 59 days | SL $5 TP $10")
-send_telegram("🤖 Gold Bot V4 WINNER Started! Backtested: $1000 -> $1310. Strategy: EMA 9/21, SL $5 TP $10, Breakeven at +$5.")
+def get_price():
+    url = "https://query1.finance.yahoo.com/v8/finance/chart/EURUSD=X?range=1d&interval=1m"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    r = requests.get(url, headers=headers, timeout=15)
+    j = r.json()
+    closes = j["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+    closes = [c for c in closes if c is not None]
+    return closes[-1]
 
-while True:
-    try:
-    r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{PAIR}?range=3d&interval=15m", headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
-    j = r.json()["chart"]["result"][0]
-    closes = [x for x in j["indicators"]["quote"][0]["close"] if x is not None]
-    df = pd.DataFrame({"Close": closes})
-except Exception as e:
-    print(f"Price fetch failed: {e} - retrying in 30s")
-    time.sleep(30)
-    continue
-if df.empty:
-    time.sleep(30)
-    continue
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        df['EMA_FAST'] = df['Close'].ewm(span=9).mean()
-        df['EMA_SLOW'] = df['Close'].ewm(span=21).mean()
-        last = df.iloc[-1]; prev = df.iloc[-2]
-        price = float(last['Close'])
-        now = datetime.now().strftime("%H:%M:%S")
-        buy_cross = prev['EMA_FAST'] < prev['EMA_SLOW'] and last['EMA_FAST'] > last['EMA_SLOW']
-        sell_cross = prev['EMA_FAST'] > prev['EMA_SLOW'] and last['EMA_FAST'] < last['EMA_SLOW']
-
-        if in_trade == "BUY":
-            if not breakeven_done and price >= entry_price + 5:
-                breakeven_done = True
-                msg = f"🔒 V4 BREAKEVEN! BUY now risk-free @ {entry_price:.2f}"
-                print(f"[{now}] {msg}"); send_telegram(msg)
-            if price >= entry_price + TAKE_PROFIT_DOLLARS:
-                profit = BALANCE * RISK_PER_TRADE * 2; balance += profit
-                msg = f"✅ V4 TAKE PROFIT +${profit:.2f}\nBUY @ {entry_price:.2f} -> {price:.2f} | Balance: ${balance:.2f}"
-                print(f"[{now}] {msg}"); send_telegram(msg); in_trade=None; breakeven_done=False
-            elif price <= entry_price - STOP_LOSS_DOLLARS:
-                loss = 0 if breakeven_done else BALANCE * RISK_PER_TRADE
-                balance -= loss
-                msg = f"❌ V4 STOP LOSS -${loss:.2f}\nBUY @ {entry_price:.2f} -> {price:.2f} | Balance: ${balance:.2f}"
-                print(f"[{now}] {msg}"); send_telegram(msg); in_trade=None; breakeven_done=False
-        elif in_trade == "SELL":
-            if not breakeven_done and price <= entry_price - 5:
-                breakeven_done = True
-                msg = f"🔒 V4 BREAKEVEN! SELL now risk-free @ {entry_price:.2f}"
-                print(f"[{now}] {msg}"); send_telegram(msg)
-            if price <= entry_price - TAKE_PROFIT_DOLLARS:
-                profit = BALANCE * RISK_PER_TRADE * 2; balance += profit
-                msg = f"✅ V4 TAKE PROFIT +${profit:.2f}\nSELL @ {entry_price:.2f} -> {price:.2f} | Balance: ${balance:.2f}"
-                print(f"[{now}] {msg}"); send_telegram(msg); in_trade=None; breakeven_done=False
-            elif price >= entry_price + STOP_LOSS_DOLLARS:
-                loss = 0 if breakeven_done else BALANCE * RISK_PER_TRADE
-                balance -= loss
-                msg = f"❌ V4 STOP LOSS -${loss:.2f}\nSELL @ {entry_price:.2f} -> {price:.2f} | Balance: ${balance:.2f}"
-                print(f"[{now}] {msg}"); send_telegram(msg); in_trade=None; breakeven_done=False
-
-        if not in_trade:
-            if buy_cross:
-                in_trade="BUY"; entry_price=price; breakeven_done=False
-                msg=f"🟢 V4 BUY!\nPrice: {price:.2f}\nSL: {price-5:.2f} | TP: {price+10:.2f}"
-                print(f"[{now}] {msg}"); send_telegram(msg)
-            elif sell_cross:
-                in_trade="SELL"; entry_price=price; breakeven_done=False
-                msg=f"🔴 V4 SELL!\nPrice: {price:.2f}\nSL: {price+5:.2f} | TP: {price-10:.2f}"
-                print(f"[{now}] {msg}"); send_telegram(msg)
-            else:
-                print(f"[{now}] Waiting... Gold ${price:.2f} | EMA9 {last['EMA_FAST']:.2f} EMA21 {last['EMA_SLOW']:.2f}")
-        time.sleep(60)
-    except KeyboardInterrupt:
-        send_telegram(f"Bot V4 stopped. Final Balance: ${balance:.2f}")
-        print(f"\nBot stopped. Final Balance: ${balance:.2f}")
-        break
-    except Exception as e:
-        print(f"Error: {e} - retrying in 30s")
+def run_bot():
+    while True:
+        try:
+            price = get_price()
+            print(f"EURUSD price: {price}", flush=True)
+        except Exception as e:
+            print(f"Price fetch failed: {e}", flush=True)
         time.sleep(30)
+
+if __name__ == "__main__":
+    import threading
+    t = threading.Thread(target=run_bot, daemon=True)
+    t.start()
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
